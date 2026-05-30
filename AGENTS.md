@@ -23,6 +23,10 @@ Instructions for AI agents working in this repository.
 
 Use `bun` as the package manager. Do not use `npm` or `yarn`.
 
+## Search
+
+Use `rg` (ripgrep) for searching. Do not use `grep`.
+
 ```bash
 bun add <package>         # Add dependency
 bun add -d <package>      # Add dev dependency
