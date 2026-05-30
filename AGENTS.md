@@ -6,42 +6,18 @@ Instructions for AI agents working in this repository.
 
 ```
 .
-├── permission/                  # The permission extension (main codebase)
-│   ├── index.ts                 # Entry point, session lifecycle, tool_call interception
-│   ├── types.ts                 # TypeScript interfaces (Rule, Preset, Config, Decision, etc.)
-│   ├── config.ts                # YAML config loading, param auto-detection
-│   ├── matcher.ts               # Rule compilation, pattern matching, 3-layer evaluation
-│   ├── state.ts                 # State management, preset switching, session persistence
-│   ├── ephemeral.ts             # Session-bound temporary rules
-│   ├── commands.ts              # /permissions command and subcommands
-│   ├── ui.ts                    # Ask-prompt formatting
-│   └── package.json             # Dependencies (js-yaml, picomatch)
+├── permission/             # Permission extension
+│   ├── index.ts            # Entry point — tool_call interception
+│   ├── matcher.ts          # Rule compilation and 3-layer evaluation
+│   ├── types.ts            # All TypeScript interfaces
+│   └── package.json
 │
-├── openspec/                    # OpenSpec change management
-│   ├── specs/                   # Living specifications (source of truth)
-│   │   ├── rule-matching/spec.md
-│   │   ├── ephemeral-rules/spec.md
-│   │   ├── preset-management/spec.md
-│   │   ├── permission-commands/spec.md
-│   │   └── interactive-prompts/spec.md
-│   └── changes/                 # Change proposals (active and archived)
-│       └── command-chain-detection/
-│           ├── proposal.md      # Why
-│           ├── design.md        # How
-│           ├── specs/           # Delta specs for this change
-│           └── tasks.md         # Implementation checklist
+├── openspec/               # Change management
+│   ├── specs/              # Living specifications (source of truth)
+│   └── changes/            # Active and archived change proposals
 │
-└── .pi/                         # pi agent configuration
-    ├── skills/                  # OpenSpec workflow skills
-    └── prompts/                 # Prompt templates for OpenSpec commands
+└── .pi/                    # Agent skills and prompts
 ```
-
-### Key entry points
-
-- **Permission evaluation flow**: `index.ts` → `matcher.ts` → `evaluate()`
-- **Rule compilation**: `config.ts` → `matcher.ts` → `compileRules()`
-- **Config loading**: `config.ts` → `loadConfig()` reads `~/.pi/permissions.yml`
-- **State management**: `state.ts` manages active preset, ephemeral rules, compiled rules
 
 ## Bun
 
