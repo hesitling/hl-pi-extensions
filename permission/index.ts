@@ -28,7 +28,7 @@ export default function (pi: ExtensionAPI) {
     state = createInitialState();
 
     // Restore saved preset from session entries
-    const savedPreset = findSavedPreset(ctx.sessionManager);
+    const savedPreset = findSavedPreset(ctx.sessionManager as any);
     if (savedPreset) {
       switchPreset(state, savedPreset);
     }
