@@ -41,16 +41,16 @@ export function registerCommand(pi: ExtensionAPI, state: PermissionState): void 
       // Complete preset names for "use"
       if (parts[0] === "use") {
         const names = getPresetNames(state.config);
-        const items = names.map((n) => ({ value: n, label: n }));
-        return items.filter((i) => i.value.startsWith(parts[1] ?? ""));
+        const items = names.map((n) => ({ value: `use ${n}`, label: n }));
+        return items.filter((i) => i.value.startsWith(prefix.trim()));
       }
       // Complete ephemeral rule ids for "rm"
       if (parts[0] === "rm") {
         const items = state.ephemeralRules.map((r) => ({
-          value: String(r.id),
+          value: `rm ${r.id}`,
           label: `#${r.id}`,
         }));
-        return items.filter((i) => i.value.startsWith(parts[1] ?? ""));
+        return items.filter((i) => i.value.startsWith(prefix.trim()));
       }
       return null;
     },
