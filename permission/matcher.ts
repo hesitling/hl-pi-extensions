@@ -1,6 +1,7 @@
 import picomatch from "picomatch";
 import type { CompiledRule, Decision, DecisionLayer, EphemeralRule, Rule, RuleAction } from "./types";
 import { resolveParam } from "./config";
+import { extractBashCommands } from "./bash-split";
 
 /**
  * Compile a single rule into a CompiledRule with pre-compiled pattern.
@@ -99,13 +100,119 @@ function buildReason(
 }
 
 /**
+ * Check if a tool call is a bash command that should be split.
+ * Returns true if the tool is "bash" and the resolved param is "command".
+ */
+function shouldSplitCommands(toolName: string, compiledRules: CompiledRule[]): boolean {
+  if (toolName !== "bash") return false;
+  // Check if any rule targets the bash command param
+  return compiledRules.some(cr => cr.resolvedParam === "command");
+}
+
+/**
  * Evaluate a tool call against the three-layer permission system.
  *
  * Layer 1: Ephemeral rules (strongest)
  * Layer 2: Active preset rules
  * Layer 3: Default action
+ *
+ * For bash tools with `param: command`, the command string is split into
+ * individual simple commands and each is evaluated independently.
+ * Any deny on any part blocks the entire call.
  */
 export function evaluate(
+  toolName: string,
+  input: Record<string, unknown>,
+  compiledEphemeralRules: CompiledRule[],
+  compiledPresetRules: CompiledRule[],
+  defaultAction: RuleAction,
+  activePresetName: string,
+): Decision {
+  // Check if we should split bash commands
+  const allRules = [...compiledEphemeralRules, ...compiledPresetRules];
+  const needsSplit = shouldSplitCommands(toolName, allRules);
+
+  if (needsSplit && typeof input.command === "string") {
+    return evaluateBashCommands(
+      input.command,
+      toolName,
+      input,
+      compiledEphemeralRules,
+      compiledPresetRules,
+      defaultAction,
+      activePresetName,
+    );
+  }
+
+  // Non-bash tools or non-command params: evaluate whole string
+  return evaluateWholeString(
+    toolName,
+    input,
+    compiledEphemeralRules,
+    compiledPresetRules,
+    defaultAction,
+    activePresetName,
+  );
+}
+
+/**
+ * Evaluate a bash command by splitting it into parts and evaluating each.
+ * Uses "any deny blocks all" aggregation.
+ */
+function evaluateBashCommands(
+  command: string,
+  toolName: string,
+  input: Record<string, unknown>,
+  compiledEphemeralRules: CompiledRule[],
+  compiledPresetRules: CompiledRule[],
+  defaultAction: RuleAction,
+  activePresetName: string,
+): Decision {
+  const parts = extractBashCommands(command);
+
+  // Track the "worst" decision across parts
+  let worstAction: RuleAction = "allow";
+  let worstDecision: Decision | null = null;
+
+  for (const part of parts) {
+    const partInput = { ...input, command: part };
+    const decision = evaluateWholeString(
+      toolName,
+      partInput,
+      compiledEphemeralRules,
+      compiledPresetRules,
+      defaultAction,
+      activePresetName,
+    );
+
+    // Track the worst action: deny > ask > allow
+    if (decision.action === "deny") {
+      return decision; // Immediate deny
+    }
+    if (decision.action === "ask" && worstAction !== "deny") {
+      worstAction = "ask";
+      worstDecision = decision;
+    }
+  }
+
+  // If any part asked (and none denied), return ask
+  if (worstDecision) {
+    return worstDecision;
+  }
+
+  // All parts allowed
+  return {
+    action: "allow",
+    reason: `All command parts allowed in preset "${activePresetName}"`,
+    layer: "preset",
+  };
+}
+
+/**
+ * Evaluate a single command string against the three-layer system.
+ * Original whole-string evaluation logic.
+ */
+function evaluateWholeString(
   toolName: string,
   input: Record<string, unknown>,
   compiledEphemeralRules: CompiledRule[],
