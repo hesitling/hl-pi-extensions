@@ -22,6 +22,7 @@ Instructions for AI agents working in this repository.
 ## Bun
 
 Use `bun` as the package manager. Do not use `npm` or `yarn`.
+Also, prefer `bunx` to `npx`.
 
 ## Search
 
