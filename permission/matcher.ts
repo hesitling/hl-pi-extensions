@@ -1,6 +1,6 @@
 import picomatch from "picomatch";
 import type { CompiledRule, Decision, DecisionLayer, EphemeralRule, Rule, RuleAction } from "./types";
-import { resolveParam } from "./config";
+import { resolveParam, parsePattern } from "./config";
 import { extractBashCommands } from "./bash-split";
 
 /**
@@ -24,19 +24,26 @@ export function compileRule(rule: Rule | EphemeralRule): CompiledRule | null {
     return null;
   }
 
-  const matchType = rule.matchType ?? "regex";
+  let engine: "regex" | "glob";
+  let pattern: string;
+  try {
+    ({ engine, pattern } = parsePattern(rule.pattern));
+  } catch {
+    console.warn(`[permission] Invalid pattern "${rule.pattern}", skipping rule`);
+    return null;
+  }
 
-  if (matchType === "glob") {
-    const matcher = picomatch(rule.pattern);
+  if (engine === "glob") {
+    const matcher = picomatch(pattern);
     return { rule, globMatcher: matcher, resolvedParam };
   }
 
-  // Default: regex
+  // Regex
   try {
-    const regex = new RegExp(rule.pattern, rule.flags ?? "");
+    const regex = new RegExp(pattern, rule.flags ?? "");
     return { rule, regex, resolvedParam };
   } catch {
-    console.warn(`[permission] Invalid regex pattern "${rule.pattern}", skipping rule`);
+    console.warn(`[permission] Invalid regex pattern "${pattern}", skipping rule`);
     return null;
   }
 }
@@ -186,10 +193,11 @@ function evaluateBashCommands(
     );
 
     // Track the worst action: deny > ask > allow
-    if (decision.action === "deny") {
+    const action = decision.action as string;
+    if (action === "deny") {
       return decision; // Immediate deny
     }
-    if (decision.action === "ask" && worstAction !== "deny") {
+    if (action === "ask") {
       worstAction = "ask";
       worstDecision = decision;
     }

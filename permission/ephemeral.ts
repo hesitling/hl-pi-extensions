@@ -1,5 +1,5 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { EphemeralRule, MatchType, PermissionState, RuleAction } from "./types";
+import type { EphemeralRule, PermissionState, RuleAction } from "./types";
 import { getDefaultParam } from "./config";
 import { compileRule } from "./matcher";
 import { recompileEphemeral } from "./state";
@@ -51,7 +51,7 @@ export function listEphemeralRules(state: PermissionState): EphemeralRule[] {
  */
 export function parseInlineAddArgs(
   args: string,
-): { tool: string | string[]; param?: string; pattern: string; action: RuleAction; reason?: string; matchType?: MatchType } | null {
+): { tool: string | string[]; param?: string; pattern: string; action: RuleAction; reason?: string } | null {
   const parts = splitArgs(args);
   if (parts.length < 3) return null;
 
@@ -167,11 +167,8 @@ export async function interactiveAdd(
   const param = await ctx.ui.input("Parameter to match:", defaultParam);
   if (!param) return null;
 
-  const pattern = await ctx.ui.input("Pattern (regex or glob):", "");
+  const pattern = await ctx.ui.input("Pattern (r:... or g:...):", "");
   if (!pattern) return null;
-
-  const matchTypeChoice = await ctx.ui.select("Match type:", ["regex", "glob"]);
-  if (!matchTypeChoice) return null;
 
   const actionChoice = await ctx.ui.select("Action:", ["allow", "deny", "ask"]);
   if (!actionChoice) return null;
@@ -182,7 +179,6 @@ export async function interactiveAdd(
     tool,
     param,
     pattern,
-    matchType: matchTypeChoice as MatchType,
     action: actionChoice as RuleAction,
     reason: reason || undefined,
   };

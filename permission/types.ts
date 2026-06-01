@@ -1,9 +1,6 @@
 /** Action to take when a rule matches */
 export type RuleAction = "allow" | "deny" | "ask";
 
-/** Pattern matching engine */
-export type MatchType = "regex" | "glob";
-
 /** Which layer a decision came from */
 export type DecisionLayer = "ephemeral" | "preset" | "default";
 
@@ -13,10 +10,8 @@ export interface Rule {
   tool: string | string[];
   /** Input parameter to match against (auto-detected for built-in tools if omitted) */
   param?: string;
-  /** Pattern string (regex or glob) */
+  /** Pattern string with r: (regex) or g: (glob) prefix */
   pattern: string;
-  /** Pattern engine: "regex" (default) or "glob" */
-  matchType?: MatchType;
   /** Regex flags (e.g., "i" for case-insensitive) */
   flags?: string;
   /** Decision when rule matches */
@@ -51,9 +46,9 @@ export interface EphemeralRule extends Rule {
 export interface CompiledRule {
   /** Original rule data */
   rule: Rule | EphemeralRule;
-  /** Compiled regex (if matchType is "regex") */
+  /** Compiled regex (if pattern uses r: prefix) */
   regex?: RegExp;
-  /** Compiled glob matcher (if matchType is "glob") */
+  /** Compiled glob matcher (if pattern uses g: prefix) */
   globMatcher?: (value: string) => boolean;
   /** Resolved parameter name (after auto-detection) */
   resolvedParam: string;

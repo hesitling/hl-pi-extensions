@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import yaml from "js-yaml";
-import type { Config, Preset, Rule, MatchType } from "./types";
+import type { Config, Preset, Rule } from "./types";
 
 const CONFIG_PATH = join(homedir(), ".pi", "permissions.yml");
 
@@ -33,6 +33,15 @@ export function getDefaultParam(toolName: string): string | undefined {
 }
 
 /**
+ * Parse a pattern string with r:/g: prefix into engine and pattern.
+ */
+export function parsePattern(raw: string): { engine: "regex" | "glob"; pattern: string } {
+  if (raw.startsWith("r:")) return { engine: "regex", pattern: raw.slice(2) };
+  if (raw.startsWith("g:")) return { engine: "glob", pattern: raw.slice(2) };
+  throw new Error(`Pattern must start with r: or g:, got "${raw}"`);
+}
+
+/**
  * Validate a single rule. Returns null if valid, error message if invalid.
  */
 function validateRule(rule: unknown, presetName: string, index: number): string | null {
@@ -56,18 +65,32 @@ function validateRule(rule: unknown, presetName: string, index: number): string 
   if (!r.pattern) {
     return `Preset "${presetName}", rule ${index + 1}: missing required field "pattern"`;
   }
-  if (r.matchType && r.matchType !== "regex" && r.matchType !== "glob") {
-    return `Preset "${presetName}", rule ${index + 1}: "matchType" must be "regex" or "glob"`;
+
+  // Reject old matchType field
+  if (r.matchType) {
+    return `Preset "${presetName}", rule ${index + 1}: matchType removed, use r:/g: prefix in pattern`;
+  }
+
+  // Parse and validate pattern prefix
+  let parsed: { engine: "regex" | "glob"; pattern: string };
+  try {
+    parsed = parsePattern(r.pattern as string);
+  } catch {
+    return `Preset "${presetName}", rule ${index + 1}: pattern must start with r: or g:, got "${r.pattern}"`;
   }
 
   // Validate regex compiles
-  const matchType = (r.matchType as MatchType) ?? "regex";
-  if (matchType === "regex") {
+  if (parsed.engine === "regex") {
     try {
-      new RegExp(r.pattern as string, (r.flags as string) ?? "");
-    } catch (e) {
-      return `Preset "${presetName}", rule ${index + 1}: invalid regex "${r.pattern}"`;
+      new RegExp(parsed.pattern, (r.flags as string) ?? "");
+    } catch {
+      return `Preset "${presetName}", rule ${index + 1}: invalid regex "${parsed.pattern}"`;
     }
+  }
+
+  // Warn if flags set on glob pattern
+  if (parsed.engine === "glob" && r.flags) {
+    console.warn(`[permission] Preset "${presetName}", rule ${index + 1}: flags only applies to r: patterns, ignoring`);
   }
 
   // Check that at least one tool in the array has a resolvable param if param is omitted
@@ -90,7 +113,6 @@ function normalizeRule(raw: Record<string, unknown>): Rule {
     tool: raw.tool as string | string[],
     param: raw.param as string | undefined,
     pattern: raw.pattern as string,
-    matchType: (raw.matchType as MatchType) ?? "regex",
     flags: raw.flags as string | undefined,
     action: raw.action as Rule["action"],
     reason: raw.reason as string | undefined,

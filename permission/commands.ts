@@ -1,6 +1,6 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import type { PermissionState } from "./types";
-import { hasPreset, getPresetNames, loadConfig } from "./config";
+import { hasPreset, getPresetNames, loadConfig, parsePattern } from "./config";
 import { switchPreset, persistPreset, reloadConfig } from "./state";
 import {
   addEphemeralRule,
@@ -226,11 +226,18 @@ function handleCheck(ctx: ExtensionCommandContext): void {
       if (!rule.tool) errors.push(`Preset "${name}", rule ${i + 1}: missing "tool"`);
       if (!rule.action) errors.push(`Preset "${name}", rule ${i + 1}: missing "action"`);
       if (!rule.pattern) errors.push(`Preset "${name}", rule ${i + 1}: missing "pattern"`);
-      if (rule.matchType === "regex" || !rule.matchType) {
+      if (rule.pattern) {
         try {
-          new RegExp(rule.pattern, rule.flags ?? "");
+          const { engine, pattern } = parsePattern(rule.pattern);
+          if (engine === "regex") {
+            try {
+              new RegExp(pattern, rule.flags ?? "");
+            } catch {
+              errors.push(`Preset "${name}", rule ${i + 1}: invalid regex "${pattern}"`);
+            }
+          }
         } catch {
-          errors.push(`Preset "${name}", rule ${i + 1}: invalid regex "${rule.pattern}"`);
+          errors.push(`Preset "${name}", rule ${i + 1}: pattern must start with r: or g:, got "${rule.pattern}"`);
         }
       }
     }
