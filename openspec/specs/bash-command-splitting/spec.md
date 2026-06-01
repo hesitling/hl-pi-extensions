@@ -113,8 +113,16 @@ The system SHALL limit recursive substitution extraction to prevent runaway pars
 - **THEN** the system SHALL stop recursing without throwing an error
 
 ### Requirement: Single-quoted substitution handling
-The system attempts to skip extraction from `$()` or backtick substitutions inside single-quoted strings, since the shell does not expand them. However, because the shell parser strips quotes during command reconstruction, this detection may not always work — the system may extract from single-quoted substitutions (false positive).
+The system SHALL NOT extract commands from `$()` or backtick substitutions that appear inside single-quoted strings, since the shell does not expand them.
 
-#### Scenario: Single-quoted substitution (known limitation)
+#### Scenario: Single-quoted dollar-paren
 - **WHEN** the command is `echo '$(whoami)'`
-- **THEN** the system MAY extract `["echo $(whoami)", "whoami"]` (false positive due to quote stripping)
+- **THEN** the system SHALL extract `["echo $(whoami)"]` (no inner extraction)
+
+#### Scenario: Single-quoted backtick
+- **WHEN** the command is `` echo '`whoami`' ``
+- **THEN** the system SHALL extract ``["echo `whoami`"]`` (no inner extraction)
+
+#### Scenario: Single-quoted does not hide unquoted substitution
+- **WHEN** the command is `echo '$(date)' $(whoami)`
+- **THEN** the system SHALL extract `["echo $(date) $(whoami)", "whoami"]`

@@ -89,6 +89,21 @@ describe("extractBashCommands", () => {
     expect(extract("echo '$(whoami)'")).toEqual(["echo $(whoami)"]);
   });
 
+  test("single-quoted backtick correctly skipped", () => {
+    expect(extract("echo '`whoami`'")).toEqual(["echo `whoami`"]);
+  });
+
+  test("single-quoted substitution with surrounding text", () => {
+    expect(extract("echo 'hello $(whoami) world'")).toEqual(["echo hello $(whoami) world"]);
+  });
+
+  test("single-quoted $() does not hide unquoted $()", () => {
+    expect(extract("echo '$(date)' $(whoami)")).toEqual([
+      "echo $(date) $(whoami)",
+      "whoami",
+    ]);
+  });
+
   // ── Fallback ────────────────────────────────────────────────────
 
   test("empty string returns original", () => {
