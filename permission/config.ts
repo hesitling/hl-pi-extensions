@@ -62,43 +62,43 @@ function validateRule(rule: unknown, presetName: string, index: number): string 
   if (!["allow", "deny", "ask"].includes(r.action as string)) {
     return `Preset "${presetName}", rule ${index + 1}: "action" must be "allow", "deny", or "ask"`;
   }
-  if (!r.pattern) {
-    return `Preset "${presetName}", rule ${index + 1}: missing required field "pattern"`;
-  }
 
   // Reject old matchType field
   if (r.matchType) {
     return `Preset "${presetName}", rule ${index + 1}: matchType removed, use r:/g: prefix in pattern`;
   }
 
-  // Parse and validate pattern prefix
-  let parsed: { engine: "regex" | "glob"; pattern: string };
-  try {
-    parsed = parsePattern(r.pattern as string);
-  } catch {
-    return `Preset "${presetName}", rule ${index + 1}: pattern must start with r: or g:, got "${r.pattern}"`;
-  }
-
-  // Validate regex compiles
-  if (parsed.engine === "regex") {
+  // Validate pattern if present
+  if (r.pattern) {
+    // Parse and validate pattern prefix
+    let parsed: { engine: "regex" | "glob"; pattern: string };
     try {
-      new RegExp(parsed.pattern, (r.flags as string) ?? "");
+      parsed = parsePattern(r.pattern as string);
     } catch {
-      return `Preset "${presetName}", rule ${index + 1}: invalid regex "${parsed.pattern}"`;
+      return `Preset "${presetName}", rule ${index + 1}: pattern must start with r: or g:, got "${r.pattern}"`;
     }
-  }
 
-  // Warn if flags set on glob pattern
-  if (parsed.engine === "glob" && r.flags) {
-    console.warn(`[permission] Preset "${presetName}", rule ${index + 1}: flags only applies to r: patterns, ignoring`);
-  }
+    // Validate regex compiles
+    if (parsed.engine === "regex") {
+      try {
+        new RegExp(parsed.pattern, (r.flags as string) ?? "");
+      } catch {
+        return `Preset "${presetName}", rule ${index + 1}: invalid regex "${parsed.pattern}"`;
+      }
+    }
 
-  // Check that at least one tool in the array has a resolvable param if param is omitted
-  if (!r.param) {
-    const tools = Array.isArray(r.tool) ? r.tool : [r.tool];
-    const hasResolvable = tools.some((t: unknown) => typeof t === "string" && BUILTIN_PARAM_MAP[t]);
-    if (!hasResolvable) {
-      return `Preset "${presetName}", rule ${index + 1}: "param" is required for custom tools (not auto-detectable)`;
+    // Warn if flags set on glob pattern
+    if (parsed.engine === "glob" && r.flags) {
+      console.warn(`[permission] Preset "${presetName}", rule ${index + 1}: flags only applies to r: patterns, ignoring`);
+    }
+
+    // Check that at least one tool in the array has a resolvable param if param is omitted
+    if (!r.param) {
+      const tools = Array.isArray(r.tool) ? r.tool : [r.tool];
+      const hasResolvable = tools.some((t: unknown) => typeof t === "string" && BUILTIN_PARAM_MAP[t]);
+      if (!hasResolvable) {
+        return `Preset "${presetName}", rule ${index + 1}: "param" is required for custom tools (not auto-detectable)`;
+      }
     }
   }
 
@@ -112,7 +112,7 @@ function normalizeRule(raw: Record<string, unknown>): Rule {
   return {
     tool: raw.tool as string | string[],
     param: raw.param as string | undefined,
-    pattern: raw.pattern as string,
+    pattern: raw.pattern as string | undefined,
     flags: raw.flags as string | undefined,
     action: raw.action as Rule["action"],
     reason: raw.reason as string | undefined,

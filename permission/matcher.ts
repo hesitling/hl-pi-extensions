@@ -5,7 +5,7 @@ import { extractBashCommandsArray } from "./bash-split";
 
 /**
  * Compile a single rule into a CompiledRule with pre-compiled pattern.
- * Returns null if the rule cannot be compiled (e.g., unresolvable param).
+ * Returns null if the rule cannot be compiled (e.g., unresolvable param for patterned rules).
  */
 export function compileRule(rule: Rule | EphemeralRule): CompiledRule | null {
   // Resolve the parameter name across all tool names in the rule
@@ -20,6 +20,12 @@ export function compileRule(rule: Rule | EphemeralRule): CompiledRule | null {
     }
   }
 
+  // Patternless rules: match all calls to the tool(s), no param needed
+  if (!rule.pattern) {
+    return { rule, resolvedParam: resolvedParam ?? undefined };
+  }
+
+  // Patterned rules require a resolvable param
   if (!resolvedParam) {
     return null;
   }
@@ -72,8 +78,13 @@ export function matchRule(compiled: CompiledRule, toolName: string, input: Recor
     return false;
   }
 
+  // Patternless rule: matches all calls to this tool
+  if (!regex && !globMatcher) {
+    return true;
+  }
+
   // Get the parameter value
-  const paramValue = input[resolvedParam];
+  const paramValue = input[resolvedParam!];
   if (paramValue === undefined || paramValue === null) {
     return false;
   }

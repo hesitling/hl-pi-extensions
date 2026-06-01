@@ -10,8 +10,8 @@ export interface Rule {
   tool: string | string[];
   /** Input parameter to match against (auto-detected for built-in tools if omitted) */
   param?: string;
-  /** Pattern string with r: (regex) or g: (glob) prefix */
-  pattern: string;
+  /** Pattern string with r: (regex) or g: (glob) prefix. When omitted, matches all calls to the tool. */
+  pattern?: string;
   /** Regex flags (e.g., "i" for case-insensitive) */
   flags?: string;
   /** Decision when rule matches */
@@ -51,7 +51,7 @@ export interface CompiledRule {
   /** Compiled glob matcher (if pattern uses g: prefix) */
   globMatcher?: (value: string) => boolean;
   /** Resolved parameter name (after auto-detection) */
-  resolvedParam: string;
+  resolvedParam?: string;
 }
 
 /** Result of evaluating a tool call against the permission rules */
