@@ -1,7 +1,7 @@
 import picomatch from "picomatch";
 import type { CompiledRule, Decision, DecisionLayer, EphemeralRule, Rule, RuleAction } from "./types";
 import { resolveParam, parsePattern } from "./config";
-import { extractBashCommands } from "./bash-split";
+import { extractBashCommandsArray } from "./bash-split";
 
 /**
  * Compile a single rule into a CompiledRule with pre-compiled pattern.
@@ -175,7 +175,7 @@ function evaluateBashCommands(
   defaultAction: RuleAction,
   activePresetName: string,
 ): Decision {
-  const parts = extractBashCommands(command);
+  const parts = extractBashCommandsArray(command);
 
   // Track the "worst" decision across parts
   let worstAction: RuleAction = "allow";
