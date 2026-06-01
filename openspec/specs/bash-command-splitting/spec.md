@@ -74,3 +74,47 @@ If the shell parser fails or command extraction yields an empty array, the syste
 #### Scenario: Parser exception
 - **WHEN** the parser throws an unexpected error
 - **THEN** the system SHALL log a warning and return `[originalCommand]`
+
+### Requirement: Recursive extraction from command substitutions
+The system SHALL recursively extract commands from `$()` (dollar-paren) and backtick command substitutions within each extracted command string.
+
+#### Scenario: Dollar-paren substitution
+- **WHEN** the command is `echo $(whoami)`
+- **THEN** the system SHALL extract `["echo $(whoami)", "whoami"]`
+
+#### Scenario: Backtick substitution
+- **WHEN** the command is `` echo `whoami` ``
+- **THEN** the system SHALL extract ``["echo `whoami`", "whoami"]``
+
+#### Scenario: Nested substitution
+- **WHEN** the command is `echo $(echo $(whoami))`
+- **THEN** the system SHALL extract `["echo $(echo $(whoami))", "echo $(whoami)", "whoami"]`
+
+#### Scenario: Substitution with compound command
+- **WHEN** the command is `echo $(whoami && date)`
+- **THEN** the system SHALL extract `["echo $(whoami && date)", "whoami", "date"]`
+
+#### Scenario: Multiple substitutions in one command
+- **WHEN** the command is `echo $(whoami) $(date)`
+- **THEN** the system SHALL extract `["echo $(whoami) $(date)", "whoami", "date"]`
+
+### Requirement: Combined with top-level splitting
+The system SHALL apply recursive substitution extraction after top-level command splitting, so both mechanisms work together.
+
+#### Scenario: Substitution inside chained commands
+- **WHEN** the command is `echo $(whoami) && rm -rf /`
+- **THEN** the system SHALL extract `["echo $(whoami)", "whoami", "rm -rf /"]`
+
+### Requirement: Recursion depth limit
+The system SHALL limit recursive substitution extraction to prevent runaway parsing.
+
+#### Scenario: Deeply nested substitution
+- **WHEN** the command contains more than 10 levels of nested `$()` substitutions
+- **THEN** the system SHALL stop recursing without throwing an error
+
+### Requirement: Single-quoted substitution handling
+The system attempts to skip extraction from `$()` or backtick substitutions inside single-quoted strings, since the shell does not expand them. However, because the shell parser strips quotes during command reconstruction, this detection may not always work — the system may extract from single-quoted substitutions (false positive).
+
+#### Scenario: Single-quoted substitution (known limitation)
+- **WHEN** the command is `echo '$(whoami)'`
+- **THEN** the system MAY extract `["echo $(whoami)", "whoami"]` (false positive due to quote stripping)
