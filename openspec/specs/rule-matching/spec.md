@@ -4,14 +4,15 @@
 Each rule SHALL have the following fields:
 - `tool`: string or array of strings — tool name(s) to match
 - `param`: string (optional for built-in tools) — input field to match against
-- `pattern`: string — regex or glob pattern
-- `matchType`: `"regex"` (default) or `"glob"` — pattern engine to use
-- `flags`: string (optional) — regex flags (e.g., `"i"` for case-insensitive)
+- `pattern`: string — pattern with `r:` (regex) or `g:` (glob) prefix
+- `flags`: string (optional) — regex flags (e.g., `"i"` for case-insensitive). Only valid with `r:` patterns.
 - `action`: `"allow"`, `"deny"`, or `"ask"` — decision when rule matches
 - `reason`: string (optional) — explanation shown to user or LLM
 
+The `matchType` field SHALL NOT be present. Rules containing `matchType` SHALL be rejected with a validation error.
+
 #### Scenario: Complete rule definition
-- **WHEN** a rule specifies `tool: bash`, `param: command`, `pattern: "\\bsudo\\b"`, `action: deny`, `reason: "No sudo"`
+- **WHEN** a rule specifies `tool: bash`, `param: command`, `pattern: "r:\\bsudo\\b"`, `action: deny`, `reason: "No sudo"`
 - **THEN** the rule SHALL be valid and match bash tool calls where the command contains the word "sudo"
 
 #### Scenario: Tool as array
@@ -21,6 +22,10 @@ Each rule SHALL have the following fields:
 #### Scenario: Missing required fields
 - **WHEN** a rule is missing the `tool` or `action` field
 - **THEN** the rule SHALL be rejected with a validation error and skipped
+
+#### Scenario: matchType field present
+- **WHEN** a rule contains a `matchType` field
+- **THEN** the rule SHALL be rejected with a validation error message: "matchType removed, use r:/g: prefix in pattern"
 
 ### Requirement: Auto-detection of param field
 For built-in tools, if `param` is omitted, the system SHALL auto-detect the parameter field based on tool name:
@@ -39,27 +44,53 @@ For built-in tools, if `param` is omitted, the system SHALL auto-detect the para
 - **WHEN** a rule targets a custom tool (not in the built-in list) and `param` is omitted
 - **THEN** the rule SHALL be rejected with a validation error
 
+### Requirement: Pattern prefix parsing
+The `pattern` field SHALL start with `r:` (regex) or `g:` (glob). The prefix determines the pattern engine. The text after the prefix is the pattern string passed to the engine.
+
+#### Scenario: Regex prefix
+- **WHEN** a rule has `pattern: "r:.*\\.env.*"`
+- **THEN** the system SHALL use regex engine with pattern `.*\\.env.*`
+
+#### Scenario: Glob prefix
+- **WHEN** a rule has `pattern: "g:**/.ssh/**"`
+- **THEN** the system SHALL use glob engine with pattern `**/.ssh/**`
+
+#### Scenario: Missing prefix
+- **WHEN** a rule has `pattern: "\\bsudo\\b"` (no prefix)
+- **THEN** the rule SHALL be rejected with a validation error: "Pattern must start with r: or g:"
+
+#### Scenario: Collision escape
+- **WHEN** a rule needs to match a literal string starting with `g:` (e.g., `g:projects/thing`)
+- **THEN** the rule SHALL use `pattern: "r:g:projects/thing"` (regex prefix, pattern is `g:projects/thing`)
+
 ### Requirement: Regex pattern matching
-When `matchType` is `"regex"` (default), the system SHALL match the rule's `pattern` against the input parameter value using JavaScript `RegExp`.
+When the pattern starts with `r:`, the system SHALL match the text after the prefix against the input parameter value using JavaScript `RegExp`.
 
 #### Scenario: Basic regex match
-- **WHEN** a rule has `pattern: "\\brm\\s+(-rf?|--recursive)"` with `flags: "i"`
+- **WHEN** a rule has `pattern: "r:\\brm\\s+(-rf?|--recursive)"` with `flags: "i"`
 - **THEN** the rule SHALL match `rm -rf /tmp/foo` and `rm --recursive /tmp/foo` (case-insensitive)
 
 #### Scenario: Invalid regex
-- **WHEN** a rule has `pattern: "[unclosed"`
+- **WHEN** a rule has `pattern: "r:[unclosed"`
 - **THEN** the system SHALL log a warning and skip the rule, continuing with remaining rules
 
 ### Requirement: Glob pattern matching
-When `matchType` is `"glob"`, the system SHALL match the rule's `pattern` against the input parameter value using `picomatch`.
+When the pattern starts with `g:`, the system SHALL match the text after the prefix against the input parameter value using `picomatch`.
 
 #### Scenario: Glob match for paths
-- **WHEN** a rule has `pattern: "**/.env*"`, `matchType: "glob"`, `tool: [write, edit]`, `param: path`
+- **WHEN** a rule has `pattern: "g:**/.env*"`, `tool: [write, edit]`, `param: path`
 - **THEN** the rule SHALL match `.env`, `.env.local`, and `config/.env.production`
 
 #### Scenario: Glob match for nested paths
-- **WHEN** a rule has `pattern: "**/.git/**"`, `matchType: "glob"`
+- **WHEN** a rule has `pattern: "g:**/.git/**"`
 - **THEN** the rule SHALL match `project/.git/config` and `.git/objects/abc`
+
+### Requirement: Flags with glob warning
+When a rule has a `g:` prefix and a `flags` field is present, the system SHALL log a warning and ignore the `flags` value. The rule SHALL NOT be rejected.
+
+#### Scenario: Flags on glob pattern
+- **WHEN** a rule has `pattern: "g:**/.ssh"` and `flags: "i"`
+- **THEN** the system SHALL log a warning "flags only applies to r: patterns, ignoring" and evaluate the glob normally
 
 ### Requirement: First-match-wins evaluation
 Rules within a layer SHALL be evaluated in order. For non-bash tools, the first rule whose `tool` and `pattern` both match SHALL determine the action. For bash tools with `param: command`, each extracted command part SHALL be evaluated independently through first-match-wins; if any part produces a deny, the entire call SHALL be blocked.
